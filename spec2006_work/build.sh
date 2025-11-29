@@ -25,3 +25,4 @@ cd ${CPU2006_DIR} && . ${CPU2006_DIR}/shrc
 printenv SPEC
 ulimit -s unlimited
 ${CPU2006_DIR}/bin/runspec -a setup -c ${CONFIG} -I ${BENCHMARK}
+${CPU2006_DIR}/bin/runspec -a run   -c ${CONFIG} -I ${BENCHMARK}

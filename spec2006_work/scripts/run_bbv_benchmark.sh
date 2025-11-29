@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ "$#" -ne 7 ]; then
+if [ "$#" -ne 8 ]; then
   echo "Usage: $0 <benchmark> <SPEC_ROOT> <SPECINVOKE> <RESULT_DIR> <BBV_DIR> <QEMU> <BBV_PLUGIN> <SIMPOINT_INTERVAL>" >&2
   exit 1
 fi
@@ -45,5 +45,3 @@ echo "[$BENCHMARK BBV {1}/$NUM_SUBCMDS] Failed"
 '
 
 echo "=== Completed all ${benchmark} BBV collection ==="
-
-
