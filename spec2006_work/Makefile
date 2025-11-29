@@ -72,6 +72,7 @@ help:
 	@echo "SPEC CPU2006 Benchmark Makefile"
 	@echo ""
 	@echo "Targets:"
+	@echo "  extract_iso    - Mount and extract SPEC CPU2006 ISO to spec2006_cdrom"
 	@echo "  prepare        - Install SPEC CPU2006"
 	@echo "  build          - build SPEC CPU2006 and build benchmarks"
 	@echo "  run            - Run all benchmarks (sequential)"
@@ -118,10 +119,34 @@ help:
 	@echo "  make -j4 run_simpoint_429.mcf run_simpoint_401.bzip2  # Run SimPoint in parallel"
 	@echo "  make -j4 run_sniper_429.mcf run_sniper_401.bzip2      # Run Sniper simulations in parallel"
 
+# Extract ISO file to spec2006_cdrom directory
+extract_iso: .extract_iso
+.extract_iso:
+	@echo "=== Extracting SPEC CPU2006 ISO ==="
+	@if [ ! -f "$(ISO_FILE)" ]; then \
+		echo "Error: ISO file not found: $(ISO_FILE)"; \
+		exit 1; \
+	fi; \
+	if [ -d "$(CDROM_DIR)" ]; then \
+		echo "Directory $(CDROM_DIR) already exists. Skipping extraction."; \
+	else \
+		mkdir -p $(CDROM_DIR); \
+		mount_point=$$(mktemp -d); \
+		echo "Mounting $(ISO_FILE) to $$mount_point..."; \
+		sudo mount -o loop,ro $(ISO_FILE) $$mount_point || exit 1; \
+		echo "Copying files from ISO to $(CDROM_DIR)..."; \
+		cp -r $$mount_point/* $(CDROM_DIR)/ || { sudo umount $$mount_point; rmdir $$mount_point; exit 1; }; \
+		echo "Unmounting ISO..."; \
+		sudo umount $$mount_point; \
+		rmdir $$mount_point; \
+		echo "=== ISO extraction completed ==="; \
+	fi
+	touch $@
+
 # Prepare SPEC2006 installation
-prepare: .prepare_spec2006
+prepare: extract_iso .prepare_spec2006
 .prepare_spec2006:
-	cd ../spec2006_cdrom && ./install.sh -f -d $(PWD)/spec2006_installed
+	cd $(CDROM_DIR) && ./install.sh -f -d $(PWD)/spec2006_installed
 	touch $@
 
 $(ALL_BENCH_TARGETS): benchmark=$(subst all_,,$@)
@@ -134,6 +159,7 @@ build: prepare .build_benchmarks
 .build_benchmarks:
 	@echo "Building all benchmarks..."
 	$(MAKE) $(addprefix build_,$(bench_lists))
+	touch $@
 
 $(BUILD_BENCH_TARGETS): benchmark=$(subst build_,,$@)
 $(BUILD_BENCH_TARGETS):
@@ -228,8 +254,11 @@ $(ESTIMATE_IPC_TARGETS):
 
 # Clean targets
 clean: clean-results
-	rm -rf .prepare_spec2006 .build_benchmarks
+	rm -rf .extract_iso .prepare_spec2006 .build_benchmarks
 	rm -rf $(SPEC_ROOT)
+
+clean-iso:
+	rm -rf .extract_iso $(CDROM_DIR)
 
 clean-results:
 	rm -rf $(RESULT_DIR)
@@ -246,4 +275,4 @@ clean-sift:
 clean-simulation:
 	rm -rf $(SIMULATION_DIR)
 
-.PHONY: help prepare build run run_bbv run_simpoint run_sift run_sniper estimate_ipc clean clean-results clean-bbv clean-simpoint clean-sift clean-simulation $(RUN_BENCH_TARGETS) $(RUN_BBV_TARGETS) $(RUN_SIMPOINT_TARGETS) $(RUN_SIFT_TARGETS) $(RUN_SNIPER_TARGETS) $(ESTIMATE_IPC_TARGETS)
+.PHONY: help extract_iso prepare build run run_bbv run_simpoint run_sift run_sniper estimate_ipc clean clean-results clean-bbv clean-simpoint clean-sift clean-simulation clean-iso $(RUN_BENCH_TARGETS) $(RUN_BBV_TARGETS) $(RUN_SIMPOINT_TARGETS) $(RUN_SIFT_TARGETS) $(RUN_SNIPER_TARGETS) $(ESTIMATE_IPC_TARGETS)
