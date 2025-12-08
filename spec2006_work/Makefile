@@ -6,7 +6,7 @@
 SPEC_ROOT := $(CURDIR)/spec2006_installed
 ISO_FILE := $(abspath ../SPECCPU_2006_v1.1.iso)
 CDROM_DIR := $(abspath ../spec2006_cdrom)
-QEMU := $(abspath ../qemu-9.2.4/build)/qemu-riscv64
+QEMU := qemu-riscv64
 QEMU_BUILD_DIR := $(abspath ../qemu-9.2.4/build)
 RISCV_SYSROOT := /riscv-linux/sysroot # inside docker container
 QEMU_FLAGS := -L $(RISCV_SYSROOT)
@@ -18,8 +18,10 @@ SIMPOINT_DIR := simpoint_results
 SIFT_DIR := sift_results
 SIMULATION_DIR := sniper_results
 SIMPOINT_INTERVAL := 100000000
-SIMPOINT := $(abspath ../SimPoint/bin/simpoint)
+SIMPOINT_SRC_DIR := $(abspath ../SimPoint)
+SIMPOINT := $(SIMPOINT_SRC_DIR)/bin/simpoint
 SIMPOINT_K := 30
+SIMPOINT_GIT_URL := https://github.com/hanhwi/SimPoint.git
 
 PATH := $(QEMU_BUILD_DIR):$(PATH)
 export PATH
@@ -75,9 +77,10 @@ help:
 	@echo "  extract_iso    - Mount and extract SPEC CPU2006 ISO to spec2006_cdrom"
 	@echo "  prepare        - Install SPEC CPU2006"
 	@echo "  build          - build SPEC CPU2006 and build benchmarks"
+	@echo "  build_simpoint - Download and build SimPoint"
 	@echo "  run            - Run all benchmarks (sequential)"
 	@echo "  run_bbv        - Run all benchmarks with BBV collection (sequential)"
-	@echo "  run_simpoint   - Run SimPoint analysis on all BBV results"
+	@echo "  run_simpoint   - Run SimPoint analysis on all BBV results (requires build_simpoint)"
 	@echo "  run_sift       - Generate SIFT traces based on SimPoint results"
 	@echo "  run_sniper     - Run Sniper simulations using SIFT traces"
 	@echo "  estimate_ipc   - Estimate overall IPC using SimPoint weights"
@@ -149,6 +152,65 @@ prepare: extract_iso .prepare_spec2006
 	cd $(CDROM_DIR) && ./install.sh -f -d $(PWD)/spec2006_installed
 	touch $@
 
+# Download and build SimPoint
+build_simpoint: .build_simpoint
+.build_simpoint: $(SIMPOINT)
+	@echo "=== SimPoint build completed ==="
+	touch $@
+
+$(SIMPOINT): .download_simpoint .apply_simpoint_patch
+	@echo "=== Building SimPoint ==="
+	@if [ ! -d "$(SIMPOINT_SRC_DIR)" ]; then \
+		echo "Error: SimPoint directory not found: $(SIMPOINT_SRC_DIR)"; \
+		exit 1; \
+	fi; \
+	cd $(SIMPOINT_SRC_DIR) && \
+	if [ -f "Makefile" ]; then \
+		make clean || true; \
+		make || exit 1; \
+	else \
+		echo "Error: Makefile not found in $(SIMPOINT_SRC_DIR)"; \
+		exit 1; \
+	fi; \
+	if [ ! -f "$(SIMPOINT)" ]; then \
+		echo "Error: SimPoint binary not found after build: $(SIMPOINT)"; \
+		exit 1; \
+	fi; \
+	echo "=== SimPoint build completed successfully ==="
+
+.apply_simpoint_patch: .download_simpoint
+	@echo "=== Applying SimPoint patches ==="
+	@if [ ! -d "$(SIMPOINT_SRC_DIR)" ]; then \
+		echo "Error: SimPoint directory not found: $(SIMPOINT_SRC_DIR)"; \
+		exit 1; \
+	fi; \
+	patch_file="$(abspath ../patches)/simpoint-skip-dimension0.patch"; \
+	if [ -f "$$patch_file" ]; then \
+		cd $(SIMPOINT_SRC_DIR) && \
+		if patch -p1 --dry-run -s < "$$patch_file" > /dev/null 2>&1; then \
+			echo "Applying patch: $$patch_file"; \
+			patch -p1 < "$$patch_file" || exit 1; \
+		else \
+			echo "Patch already applied or not needed: $$patch_file"; \
+		fi; \
+	else \
+		echo "Warning: Patch file not found: $$patch_file"; \
+	fi
+	touch $@
+
+.download_simpoint:
+	@echo "=== Downloading SimPoint ==="
+	@if [ -d "$(SIMPOINT_SRC_DIR)" ]; then \
+		echo "SimPoint directory already exists: $(SIMPOINT_SRC_DIR)"; \
+		echo "Skipping download. To re-download, remove the directory first."; \
+	else \
+		echo "Cloning SimPoint from $(SIMPOINT_GIT_URL)..."; \
+		cd $(CURDIR)/.. && \
+		git clone $(SIMPOINT_GIT_URL) SimPoint || exit 1; \
+		echo "=== SimPoint download completed ==="; \
+	fi
+	touch $@
+
 $(ALL_BENCH_TARGETS): benchmark=$(subst all_,,$@)
 $(ALL_BENCH_TARGETS):
 	$(MAKE) build_$(benchmark)
@@ -178,16 +240,23 @@ run_bbv: $(RUN_BBV_TARGETS)
 
 $(RUN_BBV_TARGETS): benchmark=$(subst run_bbv_,,$@)
 $(RUN_BBV_TARGETS):
+	@echo "Logs: $(RESULT_DIR)/$(benchmark)_bbv/ | Scripts: $(RESULT_DIR)/$(benchmark)_bbv/scripts/ | BBV: $(BBV_DIR)/$(benchmark)/"
 	./scripts/run_bbv_benchmark.sh $(benchmark) $(SPEC_ROOT) $(SPECINVOKE) $(RESULT_DIR) $(BBV_DIR) $(QEMU) $(BBV_PLUGIN) $(SIMPOINT_INTERVAL)
 
 # Run SimPoint analysis on all benchmarks
-run_simpoint: $(RUN_SIMPOINT_TARGETS)
+run_simpoint: build_simpoint $(RUN_SIMPOINT_TARGETS)
 
 $(RUN_SIMPOINT_TARGETS): benchmark=$(subst run_simpoint_,,$@)
 $(RUN_SIMPOINT_TARGETS): bbv_output_dir=$(BBV_DIR)/$(benchmark)
 $(RUN_SIMPOINT_TARGETS): simpoint_output_dir=$(SIMPOINT_DIR)/$(benchmark)
+$(RUN_SIMPOINT_TARGETS): build_simpoint
 $(RUN_SIMPOINT_TARGETS):
-	@echo "=== Running SimPoint analysis for $(benchmark) ==="
+	@if [ ! -f "$(SIMPOINT)" ]; then \
+		echo "Error: SimPoint binary not found: $(SIMPOINT)"; \
+		echo "Please run 'make build_simpoint' first."; \
+		exit 1; \
+	fi; \
+	echo "=== Running SimPoint analysis for $(benchmark) ==="
 	@mkdir -p $(simpoint_output_dir)
 	@if [ ! -d "$(bbv_output_dir)" ]; then \
 		echo "Error: BBV directory $(bbv_output_dir) not found. Please run 'make run_bbv_$(benchmark)' first."; \
@@ -204,12 +273,13 @@ $(RUN_SIMPOINT_TARGETS):
 	base_name=$$(basename $$bbv_file .bb); \
 	simpoint_out="$(simpoint_output_dir)/$${base_name}.simpoints"; \
 	weights_out="$(simpoint_output_dir)/$${base_name}.weights"; \
+	log_out="$(simpoint_output_dir)/$${base_name}.log"; \
 	echo "[$(benchmark)] Processing $$bbv_file..."; \
-	$(SIMPOINT) -loadFVFile $$bbv_file -saveSimpoints $$simpoint_out -saveSimpointWeights $$weights_out -maxK $(SIMPOINT_K) > /dev/null 2>&1; \
+	$(SIMPOINT) -loadFVFile $$bbv_file -saveSimpoints $$simpoint_out -saveSimpointWeights $$weights_out -maxK $(SIMPOINT_K) > $$log_out 2>&1; \
 	if [ -f "$$simpoint_out" ]; then \
-		echo "[$(benchmark)] SimPoint completed: $$simpoint_out (weights: $$weights_out)"; \
+		echo "[$(benchmark)] SimPoint completed: $$simpoint_out (weights: $$weights_out, log: $$log_out)"; \
 	else \
-		echo "[$(benchmark)] SimPoint failed for $$bbv_file"; \
+		echo "[$(benchmark)] SimPoint failed for $$bbv_file (check log: $$log_out)"; \
 	fi'; \
 	echo "=== Completed SimPoint analysis for $(benchmark) ==="
 
@@ -257,6 +327,12 @@ clean: clean-results
 	rm -rf .extract_iso .prepare_spec2006 .build_benchmarks
 	rm -rf $(SPEC_ROOT)
 
+clean-simpoint-build:
+	rm -rf .download_simpoint .build_simpoint
+	@if [ -d "$(SIMPOINT_SRC_DIR)" ]; then \
+		cd $(SIMPOINT_SRC_DIR) && make clean 2>/dev/null || true; \
+	fi
+
 clean-iso:
 	rm -rf .extract_iso $(CDROM_DIR)
 
@@ -275,4 +351,4 @@ clean-sift:
 clean-simulation:
 	rm -rf $(SIMULATION_DIR)
 
-.PHONY: help extract_iso prepare build run run_bbv run_simpoint run_sift run_sniper estimate_ipc clean clean-results clean-bbv clean-simpoint clean-sift clean-simulation clean-iso $(RUN_BENCH_TARGETS) $(RUN_BBV_TARGETS) $(RUN_SIMPOINT_TARGETS) $(RUN_SIFT_TARGETS) $(RUN_SNIPER_TARGETS) $(ESTIMATE_IPC_TARGETS)
+.PHONY: help extract_iso prepare build build_simpoint run run_bbv run_simpoint run_sift run_sniper estimate_ipc clean clean-results clean-bbv clean-simpoint clean-sift clean-simulation clean-iso clean-simpoint-build $(RUN_BENCH_TARGETS) $(RUN_BBV_TARGETS) $(RUN_SIMPOINT_TARGETS) $(RUN_SIFT_TARGETS) $(RUN_SNIPER_TARGETS) $(ESTIMATE_IPC_TARGETS)

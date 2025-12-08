@@ -1,0 +1,26 @@
+diff --git a/analysiscode/Utilities.cpp b/analysiscode/Utilities.cpp
+index 2ad8fad..679a038 100644
+--- a/analysiscode/Utilities.cpp
++++ b/analysiscode/Utilities.cpp
+@@ -153,6 +153,10 @@ void Utilities::loadFVFile(FVParser &parser,
+         totalWeight += sumVector;
+ 
+         for (i = current_vector.begin(); i != current_vector.end(); i++) {
++            // Skip dimension 0 entries (they cause array index -1)
++            if (i->dimension == 0) {
++                continue;
++            }
+             if (i->dimension > (int)result->numCols() || i->dimension < 1) {
+                 check(i->dimension <= (int)result->numCols(),
+                     "Utilities::loadFVFile() expecting only " +
+@@ -230,6 +234,10 @@ void Utilities::loadAndProjectFVFile(FVParser &parser,
+         for (i = current_vector.begin(); i != current_vector.end(); i++) { 
+             int dim = i->dimension;
+             double val = i->value / sumVector;
++            // Skip dimension 0 entries (they cause array index -1)
++            if (dim == 0) {
++                continue;
++            }
+             if (dim > largestDimensionSeen) { largestDimensionSeen = dim; }
+             if (dim < 1 || dim > numProjectedRows) {
+                 check(dim >= 1, "Utilities::loadAndProjectFVFile() dimension < 1");

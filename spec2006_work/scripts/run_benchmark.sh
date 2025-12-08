@@ -22,19 +22,37 @@ num_subcmds="$(echo "${subcmds}" | wc -l)"
 echo "=== Subcommands for ${benchmark} (${num_subcmds} commands)"
 
 output_dir_abs="$(cd "${output_dir}" && pwd)"
-export output_dir_abs
+scripts_dir="${output_dir_abs}/scripts"
+mkdir -p "${scripts_dir}"
 
 export BENCHMARK="${benchmark}" NUM_SUBCMDS="${num_subcmds}" RUN_DIR="${run_dir}"
 
-echo "${subcmds}" | nl -nln | \
-parallel --line-buffer --colsep '\t' -j "${num_subcmds}" '
-cmd_clean=$(echo {2} | sed "s/ [0-9]*>>* *[^ ]*//g");
-output_file="${output_dir_abs}/output_{1}.txt";
-echo "[$BENCHMARK {1}/$NUM_SUBCMDS] Starting...";
-(cd "$RUN_DIR" && eval "$cmd_clean" > "$output_file" 2>&1) && \
-echo "[$BENCHMARK {1}/$NUM_SUBCMDS] Completed" || \
-echo "[$BENCHMARK {1}/$NUM_SUBCMDS] Failed"
-'
+echo "=== Generating shell scripts for ${benchmark} ==="
+echo "${subcmds}" | awk '{print NR "\t" $0}' | while IFS=$'\t' read -r idx cmd; do
+  cmd_clean=$(echo "${cmd}" | sed 's| [0-9]*>>* *[^ ]*||g')
+  output_file="${output_dir_abs}/output_${idx}.txt"
+  script_file="${scripts_dir}/run_${idx}.sh"
+  
+  cat > "${script_file}" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+
+BENCHMARK="${benchmark}"
+RUN_DIR="${run_dir}"
+OUTPUT_FILE="${output_file}"
+
+echo "[${BENCHMARK} ${idx}/${num_subcmds}] Starting..."
+(cd "\${RUN_DIR}" && eval "${cmd_clean}" > "\${OUTPUT_FILE}" 2>&1) && \
+echo "[${BENCHMARK} ${idx}/${num_subcmds}] Completed" || \
+echo "[${BENCHMARK} ${idx}/${num_subcmds}] Failed"
+EOF
+  chmod +x "${script_file}"
+  echo "Generated: ${script_file}"
+done
+
+echo "=== Executing scripts in parallel ==="
+find "${scripts_dir}" -name "run_*.sh" -type f | sort -V | \
+parallel --line-buffer -j "${num_subcmds}" bash '{}'
 
 echo "=== Completed all ${benchmark} subcommands ==="
 
