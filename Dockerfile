@@ -132,6 +132,12 @@ RUN echo $RISCV
 
 RUN apt-get update && apt-get install -y rsync
 RUN apt-get update && apt-get install -y parallel
+RUN apt-get update && apt-get install -y \
+    p7zip-full \
+    genisoimage \
+    libpixman-1-dev \
+    gzip \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update && apt-get install -y build-essential checkinstall libncursesw5-dev libssl-dev libsqlite3-dev tk-dev libgdbm-dev libc6-dev libbz2-dev libffi-dev
 RUN wget https://www.python.org/ftp/python/2.7.18/Python-2.7.18.tgz && \
@@ -142,3 +148,5 @@ RUN wget https://www.python.org/ftp/python/2.7.18/Python-2.7.18.tgz && \
     cd - && rm -rf Python2.7.18*
 
 RUN apt-get update && apt-get install libpython3-dev python3-dev
+
+WORKDIR /workspace
