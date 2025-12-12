@@ -281,6 +281,13 @@ $(RUN_SIMPOINT_TARGETS):
 	else \
 		echo "[$(benchmark)] SimPoint failed for $$bbv_file (check log: $$log_out)"; \
 	fi'; \
+	echo "=== Compressing BBV files for $(benchmark) ==="; \
+	for bbv_file in $$bbv_files; do \
+		if [ -f "$$bbv_file" ] && [ ! -f "$$bbv_file.gz" ]; then \
+			echo "[$(benchmark)] Compressing $$bbv_file..."; \
+			gzip "$$bbv_file" || echo "[$(benchmark)] Warning: Failed to compress $$bbv_file"; \
+		fi; \
+	done; \
 	echo "=== Completed SimPoint analysis for $(benchmark) ==="
 
 # Generate SIFT traces based on SimPoint results
