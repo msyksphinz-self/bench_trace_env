@@ -45,4 +45,4 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Say Hello
-      run: docker run -it --rm -v "${PWD}:/workspace" -w /workspace simpoint-runner:latest echo "Hello, world!"
+      run: docker run --rm -v "${PWD}:/workspace" -w /workspace simpoint-runner:latest echo "Hello, world!"
