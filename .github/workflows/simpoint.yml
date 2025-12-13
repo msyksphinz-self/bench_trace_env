@@ -60,6 +60,7 @@ jobs:
             NPROC=\$((\$(nproc) / 2))
             echo \"Using \${NPROC} parallel jobs (half of available CPUs)\"
             # Run the full pipeline
+            make -C ../ build-qemu && \
             make prepare CDROM_DIR=/home/kimura/spec_bechmarks/spec2006_cdrom && \
             make build -j\${NPROC} && \
             make run_bbv -j\${NPROC} && \
