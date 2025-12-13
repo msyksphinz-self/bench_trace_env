@@ -147,7 +147,7 @@ extract_iso: .extract_iso
 	touch $@
 
 # Prepare SPEC2006 installation
-prepare: extract_iso .prepare_spec2006
+prepare: .prepare_spec2006
 .prepare_spec2006:
 	cd $(CDROM_DIR) && ./install.sh -f -d $(PWD)/spec2006_installed
 	touch $@
