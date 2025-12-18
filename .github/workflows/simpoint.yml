@@ -27,6 +27,8 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        set-safe-directory: false
 
     - name: Build Docker image
       run: |
@@ -39,7 +41,7 @@ jobs:
     runs-on: self-hosted
     needs: build-docker
     timeout-minutes: 360  # 6 hours timeout
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
