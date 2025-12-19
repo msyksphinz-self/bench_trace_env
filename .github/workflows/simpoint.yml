@@ -60,6 +60,7 @@ jobs:
         docker run --rm --user "${UID}:${GID}" \
           -v ${{ github.workspace }}:/workspace \
           -v /home/kimura/spec_bechmarks:/home/kimura/spec_bechmarks:ro \
+          -v /home/kimura/sniper_tools:/home/kimura/sniper_tools:ro \
           -w /workspace/spec2006_work \
           -e RISCV=/riscv-linux \
           -e PATH=/workspace/qemu-9.2.4/build:/riscv-linux/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
@@ -73,5 +74,8 @@ jobs:
             make build -j\${NPROC} && \
             make run_bbv -j\${NPROC} && \
             make build_simpoint && \
-            make run_simpoint -j\${NPROC}
+            make run_simpoint -j\${NPROC} && \
+            make build_sniper && \
+            make run_sift -j\${NPROC} && \
+            make run_sniper -j\${NPROC}
           "
