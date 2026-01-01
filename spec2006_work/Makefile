@@ -99,6 +99,7 @@ help:
 	@echo "  run_bbv_<benchmark>     - Run a specific benchmark with BBV collection"
 	@echo "  run_simpoint_<benchmark>- Run SimPoint analysis for a specific benchmark"
 	@echo "  run_sift_<benchmark>    - Generate SIFT traces for a specific benchmark"
+	@echo "  run_sift_<benchmark>_<subcmd>_<simpoint> - Generate SIFT, run Sniper, and cleanup for a specific SimPoint"
 	@echo "  run_sniper_<benchmark>  - Run Sniper simulation for a specific benchmark"
 	@echo "  estimate_ipc_<benchmark>- Estimate overall IPC for a specific benchmark"
 	@echo ""
@@ -117,6 +118,7 @@ help:
 	@echo "  make run_bbv_429.mcf                   # Run 429.mcf with BBV"
 	@echo "  make run_simpoint_429.mcf              # Run SimPoint on 429.mcf BBV results"
 	@echo "  make run_sift_429.mcf                  # Generate SIFT traces for 429.mcf"
+	@echo "  make run_sift_429.mcf_1_17             # Generate SIFT, run Sniper, cleanup for 429.mcf subcmd=1 simpoint=17"
 	@echo "  make run_sniper_429.mcf                # Run Sniper simulation for 429.mcf"
 	@echo "  make estimate_ipc_429.mcf              # Estimate overall IPC for 429.mcf"
 	@echo "  make -j4 run_429.mcf run_401.bzip2     # Run 2 benchmarks in parallel"
@@ -326,6 +328,28 @@ $(RUN_SIFT_TARGETS):
 	QEMU_FRONTEND_PLUGIN=$(QEMU_FRONTEND_PLUGIN) \
 	./scripts/run_sift_benchmark.sh $(benchmark) $(SIMPOINT_INTERVAL)
 
+# Generate SIFT, run Sniper, and cleanup for a specific SimPoint
+# Format: run_sift_<benchmark>_<subcmd>_<simpoint>
+# Example: run_sift_429.mcf_1_17
+run_sift_%_%_%: benchmark=$(word 1,$(subst _, ,$(subst run_sift_,,$@)))
+run_sift_%_%_%: subcmd=$(word 2,$(subst _, ,$(subst run_sift_,,$@)))
+run_sift_%_%_%: simpoint=$(word 3,$(subst _, ,$(subst run_sift_,,$@)))
+run_sift_%_%_%:
+	@SPEC_ROOT=$(SPEC_ROOT) \
+	SPECINVOKE=$(SPECINVOKE) \
+	SIMPOINT_DIR=$(SIMPOINT_DIR) \
+	SIFT_DIR=$(SIFT_DIR) \
+	SNIPER_ROOT=$(SNIPER_ROOT) \
+	PIN_HOME=$(PIN_HOME) \
+	SNIPER_SIM_LD_PATH=$(SNIPER_SIM_LD_PATH) \
+	QEMU=$(QEMU) \
+	QEMU_FLAGS="$(QEMU_FLAGS)" \
+	QEMU_CPU_OPTIONS="$(QEMU_CPU_OPTIONS)" \
+	QEMU_FRONTEND_PLUGIN=$(QEMU_FRONTEND_PLUGIN) \
+	SNIPER_CONFIG_DIR=$(SNIPER_CONFIG_DIR) \
+	SIMULATION_DIR=$(SIMULATION_DIR) \
+	./scripts/run_sift_single_simpoint.sh $(benchmark) $(subcmd) $(simpoint) $(SIMPOINT_INTERVAL)
+
 # Run Sniper simulations using SIFT traces
 run_sniper: $(RUN_SNIPER_TARGETS)
 
@@ -376,4 +400,4 @@ clean-sift:
 clean-simulation:
 	rm -rf $(SIMULATION_DIR)
 
-.PHONY: help extract_iso prepare build build_simpoint run run_bbv run_simpoint run_sift run_sniper estimate_ipc clean clean-results clean-bbv clean-simpoint clean-sift clean-simulation clean-iso clean-simpoint-build $(RUN_BENCH_TARGETS) $(RUN_BBV_TARGETS) $(RUN_SIMPOINT_TARGETS) $(RUN_SIFT_TARGETS) $(RUN_SNIPER_TARGETS) $(ESTIMATE_IPC_TARGETS)
+.PHONY: help extract_iso prepare build build_simpoint run run_bbv run_simpoint run_sift run_sniper estimate_ipc clean clean-results clean-bbv clean-simpoint clean-sift clean-simulation clean-iso clean-simpoint-build $(RUN_BENCH_TARGETS) $(RUN_BBV_TARGETS) $(RUN_SIMPOINT_TARGETS) $(RUN_SIFT_TARGETS) $(RUN_SNIPER_TARGETS) $(ESTIMATE_IPC_TARGETS) run_sift_%_%_%
