@@ -76,6 +76,9 @@ jobs:
             make build_simpoint && \
             make run_simpoint -j\${NPROC} && \
             make build_sniper && \
-            make run_sift -j\${NPROC} && \
-            make run_sniper -j\${NPROC}
+            make run_sift && \
+            make clean-bbv && \
+            make run_sniper && \
+            make clean-sift && \
+            make estimate_ipc
           "
