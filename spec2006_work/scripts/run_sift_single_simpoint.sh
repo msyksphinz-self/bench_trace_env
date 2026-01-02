@@ -65,6 +65,7 @@ fi
 echo "Found SimPoint ${simpoint} with weight ${weight}"
 
 # Prepare directories
+mkdir -p "${sift_output_dir}"
 sift_dir_abs="$(cd "${sift_output_dir}" && pwd)"
 sift_subcmd_dir="${sift_dir_abs}/subcmd_${subcmd}"
 mkdir -p "$sift_subcmd_dir"
