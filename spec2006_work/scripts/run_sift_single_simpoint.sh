@@ -107,6 +107,7 @@ sniper_script_ld_path="$original_ld_path"
 interval="$SIMPOINT_INTERVAL"
 fast_forward_target=$((simpoint * interval))
 detailed_target="${interval}"
+echo "[${benchmark} SIFT subcmd=${subcmd} simpoint=${simpoint}] SIMPOINT_INTERVAL=${interval}, fast_forward_target=${fast_forward_target}, detailed_target=${detailed_target}"
 
 # Create execution directory
 simpoint_run_dir="${sift_subcmd_dir}/run_dir_simpoint_${simpoint}"

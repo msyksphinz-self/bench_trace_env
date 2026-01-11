@@ -145,12 +145,15 @@ jobs:
             # Process each SimPoint sequentially
             processed=0
             failed=0
+            # Ensure SIMPOINT_INTERVAL is set (should match Makefile: 10000000 for 1/10 of original 100000000)
+            export SIMPOINT_INTERVAL=10000000
+            echo \"=== Using SIMPOINT_INTERVAL=\${SIMPOINT_INTERVAL} (1/10 of original) ===\"
             while IFS=\" \" read -r benchmark subcmd simpoint weight; do
               processed=\$((processed + 1))
               echo \"[PROCESS \${processed}/\${total_tasks}] \${benchmark} subcmd=\${subcmd} simpoint=\${simpoint} (weight=\${weight})\"
 
               # Run SIFT generation, Sniper simulation, and cleanup
-              if make run_sift_\${benchmark}_\${subcmd}_\${simpoint}; then
+              if SIMPOINT_INTERVAL=\${SIMPOINT_INTERVAL} make run_sift_\${benchmark}_\${subcmd}_\${simpoint}; then
                 echo \"[SUCCESS] \${benchmark} subcmd=\${subcmd} simpoint=\${simpoint}\"
               else
                 echo \"[FAILED] \${benchmark} subcmd=\${subcmd} simpoint=\${simpoint}\"
