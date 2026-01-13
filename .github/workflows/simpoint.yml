@@ -142,24 +142,48 @@ jobs:
             total_tasks=\$(wc -l < \${TASK_FILE})
             echo \"=== Found \${total_tasks} SimPoints to process ===\"
 
-            # Process each SimPoint sequentially
-            processed=0
-            failed=0
+            # Get number of CPUs available (use half for parallel processing)
+            NPROC=\$((\$(nproc) / 2))
+            echo \"=== Using \${NPROC} parallel jobs (half of available CPUs) ===\"
+
+            # Process each SimPoint in parallel
             # Ensure SIMPOINT_INTERVAL is set (should match Makefile: 10000000 for 1/10 of original 100000000)
             export SIMPOINT_INTERVAL=10000000
             echo \"=== Using SIMPOINT_INTERVAL=\${SIMPOINT_INTERVAL} (1/10 of original) ===\"
-            while IFS=\" \" read -r benchmark subcmd simpoint weight; do
-              processed=\$((processed + 1))
-              echo \"[PROCESS \${processed}/\${total_tasks}] \${benchmark} subcmd=\${subcmd} simpoint=\${simpoint} (weight=\${weight})\"
+
+            # Create temporary file to track failures
+            FAILED_FILE=\$(mktemp)
+            trap \"rm -f \${TASK_FILE} \${FAILED_FILE}\" EXIT
+
+            # Define function to process a single SimPoint task
+            process_task() {
+              local line=\"\$1\"
+              IFS=\" \" read -r benchmark subcmd simpoint weight <<< \"\${line}\"
+
+              echo \"[PROCESS] \${benchmark} subcmd=\${subcmd} simpoint=\${simpoint} (weight=\${weight})\"
 
               # Run SIFT generation, Sniper simulation, and cleanup
               if SIMPOINT_INTERVAL=\${SIMPOINT_INTERVAL} make run_sift_\${benchmark}_\${subcmd}_\${simpoint}; then
                 echo \"[SUCCESS] \${benchmark} subcmd=\${subcmd} simpoint=\${simpoint}\"
+                return 0
               else
                 echo \"[FAILED] \${benchmark} subcmd=\${subcmd} simpoint=\${simpoint}\"
-                failed=\$((failed + 1))
+                echo \"\${benchmark} \${subcmd} \${simpoint}\" >> \${FAILED_FILE}
+                return 1
               fi
-            done < \${TASK_FILE}
+            }
+
+            # Export function and variables for xargs
+            export -f process_task
+            export SIMPOINT_INTERVAL
+            export FAILED_FILE
+
+            # Process tasks in parallel using xargs
+            cat \${TASK_FILE} | xargs -P \${NPROC} -I {} bash -c 'process_task \"{}\"'
+
+            # Count failures
+            failed=\$(wc -l < \${FAILED_FILE} 2>/dev/null || echo 0)
+            processed=\${total_tasks}
 
             echo \"=== Completed: processed \${processed} SimPoints, \${failed} failed ===\"
             if [ \${failed} -gt 0 ]; then
