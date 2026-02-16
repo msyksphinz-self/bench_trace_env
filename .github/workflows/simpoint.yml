@@ -2,24 +2,13 @@ name: SimPoint Analysis
 
 on:
   workflow_dispatch:
-    inputs:
-      benchmark:
-        description: 'Benchmark to run (e.g., 400.perlbench)'
-        required: false
-        default: '400.perlbench'
-        type: string
-      run_all:
-        description: 'Run all benchmarks'
-        required: false
-        default: false
-        type: boolean
   push:
     branches:
       - main
       - master
   schedule:
-    # Run regression test once per day at 2:00 AM JST (17:00 UTC previous day)
-    - cron: '0 17 * * *'
+    # Run regression test once per week at 2:00 AM JST Monday (17:00 UTC Sunday)
+    - cron: '0 17 * * 0'
 
 jobs:
   build-docker:
@@ -40,7 +29,7 @@ jobs:
   simpoint:
     runs-on: self-hosted
     needs: build-docker
-    timeout-minutes: 720  # 128 hours timeout
+    timeout-minutes: 10080  # 1 week
 
     steps:
     - name: Checkout repository
