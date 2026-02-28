@@ -177,6 +177,11 @@ jobs:
 
             echo \"=== Completed: processed \${processed} SimPoints, \${failed} failed ===\"
             if [ \${failed} -gt 0 ]; then
+              echo \"\"
+              echo \"=== List of failed SimPoints (benchmark subcmd simpoint) ===\"
+              cat \${FAILED_FILE}
+              echo \"\"
+              echo \"=== End of failed list ===\"
               exit 1
             fi
           "

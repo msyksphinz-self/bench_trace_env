@@ -39,9 +39,9 @@ if [ ! -d "${simpoint_output_dir}" ]; then
   exit 1
 fi
 
-# Get subcommand
+# Get subcommand (use awk instead of sed to avoid sed misparsing when subcmd or subcmds contain 's' or slashes)
 subcmds="$(cd "${run_dir}" && "${SPECINVOKE}" -n 2>&1 | grep -v "^#" | grep -v "^timer" | grep -v "^$")"
-cmd_raw=$(echo "${subcmds}" | sed -n "${subcmd}p")
+cmd_raw=$(printf '%s\n' "${subcmds}" | awk -v n="${subcmd}" 'NR==n {print; exit}')
 if [ -z "${cmd_raw}" ]; then
   echo "Error: Subcommand ${subcmd} not found for ${benchmark}"
   exit 1
