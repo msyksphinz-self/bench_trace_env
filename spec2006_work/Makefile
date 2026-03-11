@@ -41,7 +41,7 @@ SNIPER_PIN_CPPLIB := $(PIN_HOME)/intel64/runtime/cpplibs
 SNIPER_PIN_XED_LIB := $(PIN_HOME)/extras/xed-intel64/lib
 SNIPER_PIN_RT_PINCRT := $(PIN_HOME)/intel64/runtime/pincrt
 SNIPER_PIN_LIB_EXT := $(PIN_HOME)/intel64/lib-ext
-SNIPER_CXX_LIB_PATH := $(strip $(shell ldd $(SNIPER_ROOT)/lib/sniper 2>/dev/null | awk '/libstdc\+\+\.so\.6/ {print $$3}' | grep '^/' | sed 's/\\/[^\\/]*$$//' | head -n1))
+SNIPER_CXX_LIB_PATH := $(strip $(shell ldd $(SNIPER_ROOT)/lib/sniper 2>/dev/null | awk '/libstdc\+\+\.so\.6/ {print $$3}' | grep '^/' | sed 's|/[^/]*$$||' | head -n1))
 SNIPER_CXX_LIB_PATH := $(if $(SNIPER_CXX_LIB_PATH),$(SNIPER_CXX_LIB_PATH),/lib/x86_64-linux-gnu)
 SNIPER_SIM_LD_PATH := $(SNIPER_PYTHON_LIB):$(SNIPER_CXX_LIB_PATH):$(SNIPER_PIN_CPPLIB):$(SNIPER_PIN_RUNTIME):$(SNIPER_PIN_RT_PINCRT):$(SNIPER_PIN_LIB_EXT):$(SNIPER_PIN_XED_LIB)
 QEMU_CPU_OPTIONS := rv64,zba=true,zbb=true,v=true,vlen=1024,vext_spec=v1.0,rvv_ta_all_1s=true,rvv_ma_all_1s=true

@@ -30,7 +30,6 @@ fi
 # Find all SIFT files in the benchmark directory and convert to absolute paths
 # Look for files matching pattern: subcmd_*/simpoint_*.sift
 if command -v realpath > /dev/null 2>&1; then
-    echo find "${sift_output_dir}" -type f -name "*.sift" # | grep -v "_response" | while read -r f; do realpath "$f"; done | sort
   sift_files=$(find "${sift_output_dir}" -type f -name "*.sift" | grep -v "_response" | while read -r f; do realpath "$f"; done | sort)
 else
   # Fallback: use find with absolute path (results are already absolute if starting dir is absolute)

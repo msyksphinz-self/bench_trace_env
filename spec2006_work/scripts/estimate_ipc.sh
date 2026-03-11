@@ -103,19 +103,19 @@ while IFS= read -r weights_file; do
     fi
 
     # Find corresponding simulation output
-    # Pattern: simpoint_X.app0.th0/sniper_results/<benchmark>/simpoint_X.app0.th0/sim.out
-    sim_out_pattern="${simulation_dir}/simpoint_${simpoint_idx}.app0.th0/sniper_results/${benchmark}/simpoint_${simpoint_idx}.app0.th0/sim.out"
+    # Actual layout: sniper_results/<benchmark>/subcmd_<N>/simpoint_<idx>/sim.out
+    sim_out_path="${simulation_dir}/subcmd_${subcmd}/simpoint_${simpoint_idx}/sim.out"
 
-    if [ ! -f "${sim_out_pattern}" ]; then
-      echo "Warning: Simulation output not found: ${sim_out_pattern}" >&2
+    if [ ! -f "${sim_out_path}" ]; then
+      echo "Warning: Simulation output not found: ${sim_out_path}" >&2
       continue
     fi
 
     # Extract IPC from sim.out (line containing "IPC")
-    ipc=$(grep -m1 "^  IPC" "${sim_out_pattern}" | awk '{print $NF}')
+    ipc=$(grep -m1 "^  IPC" "${sim_out_path}" | awk '{print $NF}')
 
     if [ -z "${ipc}" ]; then
-      echo "Warning: Could not extract IPC from ${sim_out_pattern}" >&2
+      echo "Warning: Could not extract IPC from ${sim_out_path}" >&2
       continue
     fi
 
