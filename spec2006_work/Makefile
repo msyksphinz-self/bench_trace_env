@@ -18,6 +18,9 @@ BBV_DIR := bbv_results
 SIMPOINT_DIR := simpoint_results
 SIFT_DIR := sift_results
 SIMULATION_DIR := $(CURDIR)/sniper_results
+# External SIFT/SimPoint directories (for using pre-generated traces from another environment)
+EXTERNAL_SIFT_DIR ?= /home/kimura/work/bench_trace/bench_trace_env/spec2006_work/sift_results
+EXTERNAL_SIMPOINT_DIR ?= /home/kimura/work/bench_trace/bench_trace_env/spec2006_work/simpoint_results
 -include $(CURDIR)/simpoint_config.mk
 SIMPOINT_INTERVAL ?= 1000000
 SIMPOINT_K ?= 30
@@ -69,6 +72,8 @@ RUN_SIFT_TARGETS := $(addprefix run_sift_,$(bench_lists))
 RUN_SNIPER_TARGETS := $(addprefix run_sniper_,$(bench_lists))
 RUN_FULL_TARGETS := $(addprefix run_full_,$(bench_lists))
 ESTIMATE_IPC_TARGETS := $(addprefix estimate_ipc_,$(bench_lists))
+RUN_SNIPER_EXTERNAL_TARGETS := $(addprefix run_sniper_external_,$(bench_lists))
+ESTIMATE_IPC_EXTERNAL_TARGETS := $(addprefix estimate_ipc_external_,$(bench_lists))
 BUILD_BENCH_TARGETS := $(addprefix build_,$(bench_lists))
 
 # Default target
@@ -96,7 +101,9 @@ help:
 	@echo "  run_sift       - Generate SIFT traces based on SimPoint results"
 	@echo "  run_sniper     - Run Sniper simulations using SIFT traces"
 	@echo "  run_full       - Run full benchmark via QEMU->FIFO->Sniper (no SimPoint, no SIFT files)"
+	@echo "  run_sniper_external - Run Sniper using externally generated SIFT traces (skip QEMU/SIFT steps)"
 	@echo "  estimate_ipc   - Estimate overall IPC using SimPoint weights"
+	@echo "  estimate_ipc_external - Estimate IPC using external SimPoint weights (use with run_sniper_external)"
 	@echo "  report_ipc     - Show composite SPEC/GHz from ipc_summary.csv"
 	@echo "  ci-pipeline    - Run full CI pipeline locally (same as GitHub Actions; requires CDROM_DIR)"
 	@echo "  clean          - Clean build and result directories"
@@ -113,11 +120,17 @@ help:
 	@echo "  run_sift_<benchmark>    - Generate SIFT traces for a specific benchmark"
 	@echo "  run_sift_<benchmark>_<subcmd>_<simpoint> - Generate SIFT, run Sniper, and cleanup for a specific SimPoint"
 	@echo "  run_sniper_<benchmark>  - Run Sniper simulation for a specific benchmark"
+	@echo "  run_sniper_external_<benchmark> - Run Sniper using SIFT from EXTERNAL_SIFT_DIR"
 	@echo "  run_full_<benchmark>_<subcmd> - Full run via FIFO (no SimPoint): QEMU->FIFO->Sniper"
 	@echo "  estimate_ipc_<benchmark>- Estimate overall IPC and SPEC/GHz for a specific benchmark"
+	@echo "  estimate_ipc_external_<benchmark> - Estimate IPC using EXTERNAL_SIMPOINT_DIR weights"
 	@echo "  report_ipc              - Show composite SPEC/GHz (geometric mean) from ipc_summary.csv"
 	@echo ""
 	@echo "SimPoint parameters (edit simpoint_config.mk): SIMPOINT_INTERVAL, SIMPOINT_K"
+	@echo ""
+	@echo "External SIFT variables (override on command line or in environment):"
+	@echo "  EXTERNAL_SIFT_DIR      - Path to pre-generated SIFT traces (default: $(EXTERNAL_SIFT_DIR))"
+	@echo "  EXTERNAL_SIMPOINT_DIR  - Path to SimPoint weights from external env (default: $(EXTERNAL_SIMPOINT_DIR))"
 	@echo ""
 	@echo "Output directories:"
 	@echo "  results/<benchmark>/        - Output files for each subcommand"
@@ -143,6 +156,10 @@ help:
 	@echo "  make -j4 run_bbv_429.mcf run_bbv_401.bzip2   # Run 2 with BBV in parallel"
 	@echo "  make -j4 run_simpoint_429.mcf run_simpoint_401.bzip2  # Run SimPoint in parallel"
 	@echo "  make -j4 run_sniper_429.mcf run_sniper_401.bzip2      # Run Sniper simulations in parallel"
+	@echo "  make run_sniper_external_429.mcf                       # Run Sniper with external SIFT for 429.mcf"
+	@echo "  make run_sniper_external                               # Run Sniper with external SIFT for all benchmarks"
+	@echo "  make run_sniper_external_429.mcf EXTERNAL_SIFT_DIR=/path/to/sift  # Override external SIFT path"
+	@echo "  make estimate_ipc_external_429.mcf                     # Estimate IPC with external SimPoint weights"
 
 # Extract ISO file to spec2006_cdrom directory
 extract_iso: .extract_iso
@@ -384,6 +401,27 @@ $(RUN_SNIPER_TARGETS):
 	SIMPOINT_INTERVAL=$(SIMPOINT_INTERVAL) \
 	./scripts/run_sniper_all_benchmark.sh $(benchmark)
 
+# Run Sniper simulations using externally generated SIFT traces (skip QEMU/SIFT steps)
+# Uses EXTERNAL_SIFT_DIR instead of the local SIFT_DIR.
+# Results are written to the local SIMULATION_DIR (sniper_results/).
+# Override EXTERNAL_SIFT_DIR on the command line if needed:
+#   make run_sniper_external_429.mcf EXTERNAL_SIFT_DIR=/path/to/sift
+run_sniper_external: $(RUN_SNIPER_EXTERNAL_TARGETS)
+
+$(RUN_SNIPER_EXTERNAL_TARGETS): benchmark=$(subst run_sniper_external_,,$@)
+$(RUN_SNIPER_EXTERNAL_TARGETS):
+	@if [ ! -d "$(EXTERNAL_SIFT_DIR)/$(benchmark)" ]; then \
+		echo "Error: External SIFT directory not found: $(EXTERNAL_SIFT_DIR)/$(benchmark)"; \
+		echo "Set EXTERNAL_SIFT_DIR to the correct path."; \
+		exit 1; \
+	fi
+	@SNIPER_ROOT=$(SNIPER_ROOT) \
+	SIFT_DIR=$(EXTERNAL_SIFT_DIR) \
+	SIMULATION_DIR=$(SIMULATION_DIR) \
+	CONFIG_DIR=$(SNIPER_CONFIG_DIR) \
+	SIMPOINT_INTERVAL=$(SIMPOINT_INTERVAL) \
+	./scripts/run_sniper_all_benchmark.sh $(benchmark)
+
 # Number of specinvoke subcommands per benchmark (ref workload)
 SUBCMD_COUNT_400.perlbench  := 3
 SUBCMD_COUNT_401.bzip2      := 6
@@ -445,6 +483,23 @@ $(ESTIMATE_IPC_TARGETS):
 	FREQ_GHZ=$${FREQ_GHZ:-1} \
 	python3 scripts/estimate_ipc.py $(benchmark)
 
+# Estimate IPC using external SimPoint weights (use after run_sniper_external)
+# Reads weights from EXTERNAL_SIMPOINT_DIR and simulation results from the local SIMULATION_DIR.
+estimate_ipc_external: $(ESTIMATE_IPC_EXTERNAL_TARGETS)
+
+$(ESTIMATE_IPC_EXTERNAL_TARGETS): benchmark=$(subst estimate_ipc_external_,,$@)
+$(ESTIMATE_IPC_EXTERNAL_TARGETS):
+	@if [ ! -d "$(EXTERNAL_SIMPOINT_DIR)/$(benchmark)" ]; then \
+		echo "Error: External SimPoint directory not found: $(EXTERNAL_SIMPOINT_DIR)/$(benchmark)"; \
+		echo "Set EXTERNAL_SIMPOINT_DIR to the correct path."; \
+		exit 1; \
+	fi
+	@SIMPOINT_DIR=$(EXTERNAL_SIMPOINT_DIR) \
+	SIMULATION_DIR=$(SIMULATION_DIR) \
+	SPEC_ROOT=$(SPEC_ROOT) \
+	FREQ_GHZ=$${FREQ_GHZ:-1} \
+	python3 scripts/estimate_ipc.py $(benchmark)
+
 # Composite SPEC/GHz (geometric mean) from sniper_results/ipc_summary.csv
 report_ipc:
 	@SUMMARY="$(SIMULATION_DIR)/ipc_summary.csv"; \
@@ -486,4 +541,4 @@ clean-sift:
 clean-simulation:
 	rm -rf $(SIMULATION_DIR)
 
-.PHONY: help print-simpoint-config print-simpoint-interval print-simpoint-k extract_iso prepare build build_simpoint run run_bbv run_simpoint run_sift run_sniper run_full estimate_ipc report_ipc ci-pipeline clean clean-results clean-bbv clean-simpoint clean-sift clean-simulation clean-iso clean-simpoint-build $(RUN_BENCH_TARGETS) $(RUN_BBV_TARGETS) $(RUN_SIMPOINT_TARGETS) $(RUN_SIFT_TARGETS) $(RUN_SNIPER_TARGETS) $(RUN_FULL_TARGETS) $(ESTIMATE_IPC_TARGETS) run_sift_%_%_% run_full_%
+.PHONY: help print-simpoint-config print-simpoint-interval print-simpoint-k extract_iso prepare build build_simpoint run run_bbv run_simpoint run_sift run_sniper run_sniper_external run_full estimate_ipc estimate_ipc_external report_ipc ci-pipeline clean clean-results clean-bbv clean-simpoint clean-sift clean-simulation clean-iso clean-simpoint-build $(RUN_BENCH_TARGETS) $(RUN_BBV_TARGETS) $(RUN_SIMPOINT_TARGETS) $(RUN_SIFT_TARGETS) $(RUN_SNIPER_TARGETS) $(RUN_SNIPER_EXTERNAL_TARGETS) $(RUN_FULL_TARGETS) $(ESTIMATE_IPC_TARGETS) $(ESTIMATE_IPC_EXTERNAL_TARGETS) run_sift_%_%_% run_full_%
