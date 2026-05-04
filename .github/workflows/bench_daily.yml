@@ -1,0 +1,51 @@
+# Daily SPEC performance evaluation using pre-generated external SIFT files.
+# No QEMU, BBV, SimPoint, or SIFT generation — only Sniper simulation + IPC estimation.
+# SIFT files are read from bench_trace_env (updated biweekly by sift_update.yml).
+#
+# To run the same pipeline locally (from spec2006_work):
+#   EXTERNAL_SIFT_DIR=... EXTERNAL_SIMPOINT_DIR=... ./scripts/ci_pipeline_sniper_external.sh
+
+name: Daily SPEC Benchmark (External SIFT)
+
+on:
+  schedule:
+    - cron: '0 17 * * *'  # Daily 17:00 UTC (02:00 JST next day)
+  workflow_dispatch:
+
+env:
+  EXTERNAL_SIFT_DIR: /home/kimura/work/bench_trace/bench_trace_env/spec2006_work/sift_results
+  EXTERNAL_SIMPOINT_DIR: /home/kimura/work/bench_trace/bench_trace_env/spec2006_work/simpoint_results
+
+jobs:
+  build-docker:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          set-safe-directory: false
+      - name: Build Docker image
+        run: |
+          docker build -t simpoint-runner:latest \
+            --build-arg RISCV_ARG=/riscv-linux \
+            -f Dockerfile .
+
+  bench-daily:
+    runs-on: self-hosted
+    needs: build-docker
+    timeout-minutes: 480  # 8 hours
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Sniper with external SIFT + estimate IPC
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v ${{ github.workspace }}:/workspace \
+            -v ${{ env.EXTERNAL_SIFT_DIR }}:${{ env.EXTERNAL_SIFT_DIR }}:ro \
+            -v ${{ env.EXTERNAL_SIMPOINT_DIR }}:${{ env.EXTERNAL_SIMPOINT_DIR }}:ro \
+            -v /home/kimura/sniper_tools:/home/kimura/sniper_tools:ro \
+            -w /workspace/spec2006_work \
+            -e EXTERNAL_SIFT_DIR="${{ env.EXTERNAL_SIFT_DIR }}" \
+            -e EXTERNAL_SIMPOINT_DIR="${{ env.EXTERNAL_SIMPOINT_DIR }}" \
+            -e RISCV=/riscv-linux \
+            simpoint-runner:latest \
+            ./scripts/ci_pipeline_sniper_external.sh
