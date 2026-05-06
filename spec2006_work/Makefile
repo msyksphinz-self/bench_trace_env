@@ -46,6 +46,14 @@ SNIPER_CXX_LIB_PATH := $(if $(SNIPER_CXX_LIB_PATH),$(SNIPER_CXX_LIB_PATH),/lib/x
 SNIPER_SIM_LD_PATH := $(SNIPER_PYTHON_LIB):$(SNIPER_CXX_LIB_PATH):$(SNIPER_PIN_CPPLIB):$(SNIPER_PIN_RUNTIME):$(SNIPER_PIN_RT_PINCRT):$(SNIPER_PIN_LIB_EXT):$(SNIPER_PIN_XED_LIB)
 QEMU_CPU_OPTIONS := rv64,zba=true,zbb=true,v=true,vlen=1024,vext_spec=v1.0,rvv_ta_all_1s=true,rvv_ma_all_1s=true
 
+# Docker image used for Sniper simulation (requires Python 3.12 + glibc 2.39)
+SNIPER_DOCKER_IMAGE ?= sniper-riscv
+DOCKER_RUN := docker run --rm \
+	-v $(HOME):$(HOME) \
+	--user $(shell id -u):$(shell id -g) \
+	-w $(CURDIR) \
+	$(SNIPER_DOCKER_IMAGE)
+
 # Benchmark list
 bench_lists += 400.perlbench
 bench_lists += 401.bzip2
@@ -94,7 +102,8 @@ help:
 	@echo "  run_bbv        - Run all benchmarks with BBV collection (sequential)"
 	@echo "  run_simpoint   - Run SimPoint analysis on all BBV results (requires build_simpoint)"
 	@echo "  run_sift       - Generate SIFT traces based on SimPoint results"
-	@echo "  run_sniper     - Run Sniper simulations using SIFT traces"
+	@echo "  run_sniper     - Run Sniper simulations using SIFT traces (inside $(SNIPER_DOCKER_IMAGE) Docker)"
+	@echo "  setup_python_kit - Setup python_kit stdlib symlink (run inside $(SNIPER_DOCKER_IMAGE) Docker)"
 	@echo "  run_full       - Run full benchmark via QEMU->FIFO->Sniper (no SimPoint, no SIFT files)"
 	@echo "  estimate_ipc   - Estimate overall IPC using SimPoint weights"
 	@echo "  report_ipc     - Show composite SPEC/GHz from ipc_summary.csv"
@@ -173,6 +182,21 @@ prepare: .prepare_spec2006
 .prepare_spec2006:
 	cd $(CDROM_DIR) && ./install.sh -f -d $(PWD)/spec2006_installed
 	touch $@
+
+# Setup python_kit stdlib symlink (required for embedded Python in sniper-riscv container)
+# Run this inside the sniper-riscv Docker container after building Sniper.
+setup_python_kit:
+	$(DOCKER_RUN) sh -c "\
+		PYTHON_KIT_BIN=$(SNIPER_ROOT)/python_kit/intel64/bin/python && \
+		mkdir -p \$$PYTHON_KIT_BIN && \
+		PY_VER=\$$(python3 -c \"import sys; print(f'python{sys.version_info.major}.{sys.version_info.minor}')\") && \
+		PY_STDLIB=\$$(python3 -c \"import sysconfig; print(sysconfig.get_path('stdlib'))\") && \
+		if [ ! -e \$$PYTHON_KIT_BIN/\$$PY_VER ]; then \
+			ln -s \$$PY_STDLIB \$$PYTHON_KIT_BIN/\$$PY_VER && \
+			echo \"Linked \$$PYTHON_KIT_BIN/\$$PY_VER -> \$$PY_STDLIB\"; \
+		else \
+			echo \"Already exists: \$$PYTHON_KIT_BIN/\$$PY_VER\"; \
+		fi"
 
 # Download and build Sniper
 build_sniper: .build_sniper
@@ -372,17 +396,18 @@ run_sift_%:
 	SIMULATION_DIR=$(SIMULATION_DIR) \
 	./scripts/run_sift_single_simpoint.sh $(benchmark) $(subcmd) $(simpoint) $(SIMPOINT_INTERVAL)
 
-# Run Sniper simulations using SIFT traces
+# Run Sniper simulations using SIFT traces (executed inside sniper-riscv Docker)
 run_sniper: $(RUN_SNIPER_TARGETS)
 
 $(RUN_SNIPER_TARGETS): benchmark=$(subst run_sniper_,,$@)
 $(RUN_SNIPER_TARGETS):
-	@SNIPER_ROOT=$(SNIPER_ROOT) \
-	SIFT_DIR=$(SIFT_DIR) \
-	SIMULATION_DIR=$(SIMULATION_DIR) \
-	CONFIG_DIR=$(SNIPER_CONFIG_DIR) \
-	SIMPOINT_INTERVAL=$(SIMPOINT_INTERVAL) \
-	./scripts/run_sniper_all_benchmark.sh $(benchmark)
+	@$(DOCKER_RUN) \
+		sh -c "SNIPER_ROOT=$(SNIPER_ROOT) \
+		SIFT_DIR=$(SIFT_DIR) \
+		SIMULATION_DIR=$(SIMULATION_DIR) \
+		CONFIG_DIR=$(SNIPER_CONFIG_DIR) \
+		SIMPOINT_INTERVAL=$(SIMPOINT_INTERVAL) \
+		./scripts/run_sniper_all_benchmark.sh $(benchmark)"
 
 # Number of specinvoke subcommands per benchmark (ref workload)
 SUBCMD_COUNT_400.perlbench  := 3
