@@ -1,0 +1,79 @@
+# Biweekly SIFT trace regeneration in bench_trace_env.
+# Runs on the 1st and 15th of each month (≈ every 2 weeks), starting at 09:00 UTC (18:00 JST).
+# The daily benchmark (bench_daily.yml) runs at 17:00 UTC — scheduled 8 hours later to
+# avoid reading partially-written SIFT files on update days.
+#
+# Default mode (scheduled / workflow_dispatch without full_rebuild):
+#   make clean-sift → make run_sift    (uses existing SimPoint results)
+#
+# Full rebuild mode (workflow_dispatch with full_rebuild=true):
+#   make run_bbv → make run_simpoint → make clean-sift → make run_sift
+#   Use this when benchmarks or QEMU configuration changed.
+
+name: Biweekly SIFT Update
+
+on:
+  schedule:
+    - cron: '0 9 1,15 * *'  # 1st and 15th, 09:00 UTC (18:00 JST)
+  workflow_dispatch:
+    inputs:
+      full_rebuild:
+        description: 'Full rebuild: re-run BBV and SimPoint before SIFT generation (slow)'
+        type: boolean
+        default: false
+
+env:
+  BENCH_TRACE_ENV_DIR: /home/kimura/work/bench_trace/bench_trace_env
+
+jobs:
+  sift-update:
+    runs-on: self-hosted
+    timeout-minutes: 10080  # 1 week max
+    steps:
+      - name: Verify bench_trace_env directory
+        run: |
+          if [ ! -d "${{ env.BENCH_TRACE_ENV_DIR }}/spec2006_work" ]; then
+            echo "Error: bench_trace_env not found at ${{ env.BENCH_TRACE_ENV_DIR }}"
+            echo "Update BENCH_TRACE_ENV_DIR in this workflow to the correct path."
+            exit 1
+          fi
+          echo "bench_trace_env: ${{ env.BENCH_TRACE_ENV_DIR }}"
+
+      - name: Build Docker image
+        run: |
+          cd "${{ env.BENCH_TRACE_ENV_DIR }}"
+          docker build -t simpoint-runner:sift-update \
+            --build-arg RISCV_ARG=/riscv-linux \
+            -f Dockerfile .
+
+      - name: Full rebuild — re-run BBV and SimPoint (manual trigger only)
+        if: ${{ github.event.inputs.full_rebuild == 'true' }}
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v ${{ env.BENCH_TRACE_ENV_DIR }}:/workspace \
+            -v /home/kimura/sniper_tools:/home/kimura/sniper_tools:ro \
+            -w /workspace/spec2006_work \
+            -e PATH=/workspace/qemu-9.2.4/build:/riscv-linux/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+            -e RISCV=/riscv-linux \
+            simpoint-runner:sift-update \
+            bash -c "make run_bbv && make build_simpoint && make run_simpoint && make clean-sift"
+
+      - name: Clean old SIFT files (incremental update)
+        if: ${{ github.event.inputs.full_rebuild != 'true' }}
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v ${{ env.BENCH_TRACE_ENV_DIR }}:/workspace \
+            -w /workspace/spec2006_work \
+            simpoint-runner:sift-update \
+            make clean-sift
+
+      - name: Regenerate SIFT files
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v ${{ env.BENCH_TRACE_ENV_DIR }}:/workspace \
+            -v /home/kimura/sniper_tools:/home/kimura/sniper_tools:ro \
+            -w /workspace/spec2006_work \
+            -e PATH=/workspace/qemu-9.2.4/build:/riscv-linux/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+            -e RISCV=/riscv-linux \
+            simpoint-runner:sift-update \
+            make run_sift
