@@ -219,11 +219,13 @@ output_subdir_abs="$(cd "${output_subdir}" && pwd)"
 cd "${output_subdir_abs}"
 RUN_SNIPER="${SNIPER_ROOT}/run-sniper"
 CONFIG_BASE="${SNIPER_CONFIG_DIR}/riscv.cfg"
+SPEC_OVERRIDE_CFG="${SCRIPT_DIR}/../sniper_configs/spec.cfg"
 LOG_FILE="${output_subdir_abs}/sniper.log"
 
 "${RUN_SNIPER}" \
   -v \
   -c "${CONFIG_BASE}" \
+  -c "${SPEC_OVERRIDE_CFG}" \
   --roi-script \
   --no-cache-warming \
   -s "roi-icount:${ROI_ICOUNT_PARAMS}" \

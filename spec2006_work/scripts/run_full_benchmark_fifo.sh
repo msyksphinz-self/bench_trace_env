@@ -149,6 +149,7 @@ sniper_script_ld_path="${original_ld_path}"
 # ---- start Sniper in background ---------------------------------------------
 RUN_SNIPER="${SNIPER_ROOT}/run-sniper"
 CONFIG_BASE="${SNIPER_CONFIG_DIR}/riscv.cfg"
+SPEC_OVERRIDE_CFG="${SCRIPT_DIR}/../sniper_configs/spec.cfg"
 LOG_FILE="${output_subdir_abs}/sniper.log"
 
 echo "[${benchmark}] Starting Sniper (background)..."
@@ -157,6 +158,7 @@ echo "[${benchmark}] Starting Sniper (background)..."
 "${RUN_SNIPER}" \
   -v \
   -c "${CONFIG_BASE}" \
+  -c "${SPEC_OVERRIDE_CFG}" \
   -c "general/magic=false" \
   -c "general/app=${benchmark}" \
   -c "perf_model/core/rob_timer/vec_physical_registers=40" \

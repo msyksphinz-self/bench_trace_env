@@ -440,12 +440,13 @@ $(RUN_SNIPER_EXTERNAL_TARGETS):
 		echo "Set EXTERNAL_SIFT_DIR to the correct path."; \
 		exit 1; \
 	fi
-	@SNIPER_ROOT=$(SNIPER_ROOT) \
-	SIFT_DIR=$(EXTERNAL_SIFT_DIR) \
-	SIMULATION_DIR=$(SIMULATION_DIR) \
-	CONFIG_DIR=$(SNIPER_CONFIG_DIR) \
-	SIMPOINT_INTERVAL=$(SIMPOINT_INTERVAL) \
-	./scripts/run_sniper_all_benchmark.sh $(benchmark)
+	@$(DOCKER_RUN) \
+		sh -c "SNIPER_ROOT=$(SNIPER_ROOT) \
+		SIFT_DIR=$(EXTERNAL_SIFT_DIR) \
+		SIMULATION_DIR=$(SIMULATION_DIR) \
+		CONFIG_DIR=$(SNIPER_CONFIG_DIR) \
+		SIMPOINT_INTERVAL=$(SIMPOINT_INTERVAL) \
+		./scripts/run_sniper_all_benchmark.sh $(benchmark)"
 
 # Number of specinvoke subcommands per benchmark (ref workload)
 SUBCMD_COUNT_400.perlbench  := 3

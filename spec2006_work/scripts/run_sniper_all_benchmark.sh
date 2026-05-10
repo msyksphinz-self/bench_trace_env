@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SPEC_OVERRIDE_CFG="$(cd "${SCRIPT_DIR}/.." && pwd)/sniper_configs/spec.cfg"
+
 if [ "$#" -lt 1 ]; then
   echo "Usage: SNIPER_ROOT=... SIFT_DIR=... SIMULATION_DIR=... CONFIG_DIR=... SIMPOINT_INTERVAL=... $0 <benchmark> [config_options...]" >&2
   exit 1
@@ -136,11 +139,13 @@ mkdir -p "${output_subdir}"
 # Build run-sniper command
 RUN_SNIPER="${SNIPER_ROOT}/run-sniper"
 CONFIG_BASE="${CONFIG_DIR}/riscv.cfg"
+SPEC_OVERRIDE_CFG="${SPEC_OVERRIDE_CFG}"
 
 # Default configuration options
 DEFAULT_OPTIONS=(
   "-v"
   "-c" "\${CONFIG_BASE}"
+  "-c" "\${SPEC_OVERRIDE_CFG}"
   "--roi-script"
   "--no-cache-warming"
   "-s" "roi-icount:${ROI_ICOUNT_PARAMS}"
