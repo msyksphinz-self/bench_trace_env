@@ -446,6 +446,7 @@ $(RUN_SNIPER_EXTERNAL_TARGETS):
 		SIMULATION_DIR=$(SIMULATION_DIR) \
 		CONFIG_DIR=$(SNIPER_CONFIG_DIR) \
 		SIMPOINT_INTERVAL=$(SIMPOINT_INTERVAL) \
+		PARALLEL_JOBS=$${PARALLEL_JOBS:-} \
 		./scripts/run_sniper_all_benchmark.sh $(benchmark)"
 
 # Number of specinvoke subcommands per benchmark (ref workload)

@@ -203,7 +203,7 @@ if [ -f "${all_script_list_file}" ] && [ -s "${all_script_list_file}" ]; then
   echo "Generated ${num_scripts} executable script(s)"
 
   if command -v parallel > /dev/null 2>&1; then
-    echo "Running simulations in parallel..."
+    echo "Running simulations in parallel (GNU parallel)..."
     # Limit parallel jobs to avoid file handle issues
     PARALLEL_JOBS="${PARALLEL_JOBS:-$(nproc)}"
     if [ "$PARALLEL_JOBS" -gt 252 ]; then
@@ -213,8 +213,17 @@ if [ -f "${all_script_list_file}" ] && [ -s "${all_script_list_file}" ]; then
     parallel --line-buffer -j "${PARALLEL_JOBS}" '{}' || {
       echo "Warning: Some simulations failed" >&2
     }
+  elif command -v xargs > /dev/null 2>&1; then
+    PARALLEL_JOBS="${PARALLEL_JOBS:-$(nproc)}"
+    if [ "$PARALLEL_JOBS" -gt 252 ]; then
+      PARALLEL_JOBS=252
+    fi
+    echo "Running simulations in parallel (xargs -P ${PARALLEL_JOBS})..."
+    xargs -a "${all_script_list_file}" -d '\n' -n 1 -P "${PARALLEL_JOBS}" -I {} bash -c '"$@"' _ {} || {
+      echo "Warning: Some simulations failed" >&2
+    }
   else
-    echo "Running simulations sequentially (parallel command not available)..."
+    echo "Running simulations sequentially (parallel/xargs not available)..."
     while IFS= read -r script_file; do
       "${script_file}" || {
         echo "Warning: Simulation failed: ${script_file}" >&2
